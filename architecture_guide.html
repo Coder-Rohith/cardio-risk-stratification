@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CardioRisk AI · End-to-End System Architecture & Data Flow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #070a14;
+            --bg-card: rgba(15, 23, 42, 0.75);
+            --bg-card-hover: rgba(30, 41, 59, 0.85);
+            --border-glow: rgba(59, 130, 246, 0.25);
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-purple: #8b5cf6;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: radial-gradient(circle at 50% 0%, #0f172a 0%, #070a14 100%);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header / Banner */
+        .hero {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(6, 182, 212, 0.12) 50%, rgba(139, 92, 246, 0.12) 100%);
+            border: 1px solid var(--border-glow);
+            border-radius: 24px;
+            padding: 40px;
+            margin-bottom: 36px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .badge-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .badge {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: var(--accent-cyan);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.82em;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .badge.green {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: var(--accent-emerald);
+        }
+
+        .badge.purple {
+            background: rgba(139, 92, 246, 0.15);
+            border-color: rgba(139, 92, 246, 0.3);
+            color: var(--accent-purple);
+        }
+
+        .hero h1 {
+            font-size: 2.6em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa, #22d3ee, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .hero p {
+            color: var(--text-secondary);
+            font-size: 1.1em;
+            max-width: 900px;
+        }
+
+        /* Grid Layout */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 36px;
+        }
+
+        @media (max-width: 900px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        /* Glass Cards */
+        .glass-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(16px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .glass-card:hover {
+            border-color: var(--border-glow);
+            transform: translateY(-4px);
+            box-shadow: 0 15px 35px rgba(59, 130, 246, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .card-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .card-subtitle {
+            font-size: 0.88em;
+            color: var(--text-muted);
+        }
+
+        /* Flow Visualizer Diagram */
+        .architecture-diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glow);
+            border-radius: 24px;
+            padding: 36px;
+            margin-bottom: 36px;
+            backdrop-filter: blur(20px);
+        }
+
+        .diagram-title {
+            font-size: 1.4em;
+            font-weight: 700;
+            margin-bottom: 24px;
+            text-align: center;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .flow-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: relative;
+        }
+
+        .flow-step-node {
+            display: flex;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px 24px;
+            gap: 20px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .flow-step-node:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.2);
+        }
+
+        .step-number {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            color: #fff;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            flex-shrink: 0;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            font-weight: 700;
+            font-size: 1.1em;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .step-desc {
+            font-size: 0.92em;
+            color: var(--text-secondary);
+        }
+
+        .step-tech {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.82em;
+            color: var(--accent-cyan);
+            margin-top: 6px;
+        }
+
+        .flow-arrow {
+            text-align: center;
+            color: var(--accent-blue);
+            font-size: 1.5em;
+            margin: -8px 0;
+            animation: pulseArrow 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseArrow {
+            0%, 100% { transform: translateY(0); opacity: 0.6; }
+            50% { transform: translateY(4px); opacity: 1; }
+        }
+
+        /* Tabs Component */
+        .tab-section {
+            margin-bottom: 36px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 24px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.95em;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            color: #fff;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(6, 182, 212, 0.25));
+            border: 1px solid var(--border-glow);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Code Block */
+        .code-snippet {
+            background: #090d16;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 18px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.88em;
+            color: #e2e8f0;
+            overflow-x: auto;
+            margin-top: 14px;
+            line-height: 1.5;
+        }
+
+        .code-keyword { color: #f472b6; }
+        .code-func { color: #60a5fa; }
+        .code-str { color: #34d399; }
+        .code-comment { color: #64748b; font-style: italic; }
+
+        /* Performance Specs Table */
+        .spec-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .spec-table th, .spec-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .spec-table th {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .spec-table td {
+            font-size: 0.95em;
+        }
+
+        .spec-value {
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.1));
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 14px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .highlight-box h4 {
+            color: var(--accent-emerald);
+            margin-bottom: 8px;
+            font-size: 1.05em;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.88em;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Hero Header -->
+        <header class="hero">
+            <div class="badge-row">
+                <span class="badge">Architecture Guide</span>
+                <span class="badge green">Real-Time Inference &lt; 200ms</span>
+                <span class="badge purple">SHAP TreeExplainer</span>
+            </div>
+            <h1>CardioRisk AI Architecture & Data Flow</h1>
+            <p>Complete end-to-end technical explanation of how the Streamlit frontend communicates with the clinical preprocessing engine, model ensemble (XGBoost + RSF + Logistic Regression), and SHAP explainability core.</p>
+        </header>
+
+        <!-- Interactive Flow Diagram -->
+        <section class="architecture-diagram">
+            <h2 class="diagram-title">⚡ End-to-End Data Life-Cycle & Communication Flow</h2>
+            <div class="flow-container">
+
+                <div class="flow-step-node">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div class="step-title">Frontend Input Capture (Streamlit Sidebar)</div>
+                        <div class="step-desc">Clinician modifies patient parameters (Age, SBP, DBP, Lipids, Glucose, Smoking, CRP, etc.) in the Streamlit UI widgets.</div>
+                        <div class="step-tech">UI: Streamlit Sidebar Sliders &amp; Selectboxes → In-memory pandas.DataFrame</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">▼</div>
+
+                <div class="flow-step-node">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div class="step-title">WebSocket / Event Loop Trigger & In-Memory IPC</div>
+                        <div class="step-desc">Streamlit's Tornado web server detects browser input state change over WebSocket. The Python script reruns reactively, invoking loaded models in RAM without network roundtrips.</div>
+                        <div class="step-tech">Protocol: WebSocket / Shared RAM Execution → Python Process Runtime</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">▼</div>
+
+                <div class="flow-step-node">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div class="step-title">Clinical Feature Engineering & Preprocessing</div>
+                        <div class="step-desc">Derived clinical ratios are calculated (Chol/HDL ratio, LDL/HDL ratio, TG/HDL ratio, Pulse Pressure, MAP, Metabolic Risk score). Missing values are median-imputed, and continuous features are transformed via <code>StandardScaler</code>.</div>
+                        <div class="step-tech">Module: src/preprocessing.py → ClinicalDataPreprocessor.transform(df) → 30 Feature Array</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">▼</div>
+
+                <div class="flow-step-node">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div class="step-title">Probabilistic Multi-Model Ensemble Inference</div>
+                        <div class="step-desc">3 models evaluate the patient features concurrently:
+                            <br>• <b>XGBoost (Isotonic-Calibrated)</b>: Non-linear gradient boosted trees mapped via isotonic regression.
+                            <br>• <b>Random Survival Forest (RSF)</b>: Time-to-event cumulative hazard prediction over 5-year horizon.
+                            <br>• <b>Logistic Regression (L2)</b>: Ridge-regularized baseline estimator.
+                            <br>Outputs are combined via weighted ensemble formula: <code>0.50*XGB + 0.25*RSF + 0.25*LR</code>.
+                        </div>
+                        <div class="step-tech">Module: src/models.py → EnsembleRiskModel.predict_proba() → Calibrated Probability Score</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">▼</div>
+
+                <div class="flow-step-node">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div class="step-title">SHAP Local Attribution Calculation</div>
+                        <div class="step-desc">SHAP <code>TreeExplainer</code> calculates exact Shapley additive attributions (&phi;) for the patient, determining which clinical features increase risk (&phi; &gt; 0) vs decrease risk (&phi; &lt; 0).</div>
+                        <div class="step-tech">Module: src/explainability.py → SHAPExplainer.explain_patient() → Feature Attributions</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">▼</div>
+
+                <div class="flow-step-node">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <div class="step-title">Reactive UI Render (&lt;200ms Latency)</div>
+                        <div class="step-desc">Streamlit renders the real-time Plotly risk gauge, model comparison bar chart, top risk/protective factor list, SHAP waterfall plot, and clinical recommendations.</div>
+                        <div class="step-tech">UI: Plotly + Matplotlib + Custom CSS → HTML DOM Update via WebSocket</div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Deep Dive Tabs -->
+        <section class="tab-section">
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="openTab('frontend-backend')">🖥️ Frontend to Backend Communication</button>
+                <button class="tab-btn" onclick="openTab('preprocessing-eng')">🧪 Clinical Data & Preprocessing</button>
+                <button class="tab-btn" onclick="openTab('ml-ensemble')">🤖 Ensemble & Calibration</button>
+                <button class="tab-btn" onclick="openTab('shap-explain')">🔍 SHAP Explainability</button>
+            </div>
+
+            <!-- Tab 1: Frontend to Backend Communication -->
+            <div id="frontend-backend" class="tab-content active glass-card">
+                <div class="card-header">
+                    <div class="card-icon">⚡</div>
+                    <div>
+                        <div class="card-title">How Frontend & Backend Communicate</div>
+                        <div class="card-subtitle">Architectural design of Streamlit's reactive loop and IPC latency</div>
+                    </div>
+                </div>
+
+                <p>Unlike traditional decoupled web apps (e.g. React single-page apps communicating with REST APIs via HTTP REST/JSON fetch over the network), <b>CardioRisk AI</b> leverages a single-process unified architecture using <b>Streamlit</b>:</p>
+
+                <ul style="margin: 16px 0 16px 24px; color: var(--text-secondary);">
+                    <li><b>WebSocket Event Transport:</b> When a user drags a slider or changes a dropdown in the browser UI, a lightweight binary event payload is sent across a persistent WebSocket connection to the Python Tornado server.</li>
+                    <li><b>Zero Network Latency Preprocessing:</b> Because the UI code (<code>app/streamlit_app.py</code>) and ML engine (<code>src/models.py</code>) execute inside the exact same Python process memory space, feature vectors are passed directly in RAM as NumPy/pandas objects (zero HTTP serializing or network overhead).</li>
+                    <li><b>Cached Model Artifacts (<code>@st.cache_resource</code>):</b> Model binary weights, scalers, and SHAP explainers are loaded into process memory once at startup. Subsequent patient predictions reuse pre-compiled memory references.</li>
+                </ul>
+
+                <div class="code-snippet">
+<span class="code-comment"># In app/streamlit_app.py - Models loaded once into process RAM</span>
+<span class="code-keyword">@st.cache_resource</span>
+<span class="code-keyword">def</span> <span class="code-func">load_models</span>():
+    artifacts = {}
+    artifacts[<span class="code-str">"preprocessor"</span>] = ClinicalDataPreprocessor().load(<span class="code-str">"models/preprocessor.joblib"</span>)
+    artifacts[<span class="code-str">"ensemble"</span>] = joblib.load(<span class="code-str">"models/ensemble_model.joblib"</span>)
+    <span class="code-keyword">return</span> artifacts
+
+<span class="code-comment"># Execution loop: Runs in ~67ms on local CPU</span>
+t0 = time.perf_counter()
+X_patient = artifacts[<span class="code-str">"preprocessor"</span>].transform(patient_data)
+ensemble_prob = artifacts[<span class="code-str">"ensemble"</span>].predict_proba(X_patient)[<span class="code-str">0</span>, <span class="code-str">1</span>]
+latency_ms = (time.perf_counter() - t0) * <span class="code-str">1000</span>
+                </div>
+            </div>
+
+            <!-- Tab 2: Clinical Data & Preprocessing -->
+            <div id="preprocessing-eng" class="tab-content glass-card">
+                <div class="card-header">
+                    <div class="card-icon">🧪</div>
+                    <div>
+                        <div class="card-title">Clinical Preprocessing & Feature Engineering</div>
+                        <div class="card-subtitle">Transforming 20 baseline variables into 30 predictive clinical indicators</div>
+                    </div>
+                </div>
+
+                <p>CardioRisk AI engineers derived physiological metrics proven in Framingham & ASCVD risk literature:</p>
+
+                <table class="spec-table">
+                    <thead>
+                        <tr>
+                            <th>Feature Name</th>
+                            <th>Clinical Formula / Logic</th>
+                            <th>Medical Rationale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="spec-value">chol_hdl_ratio</td>
+                            <td><code>total_cholesterol / (hdl + 1)</code></td>
+                            <td>Primary atherogenic indicator superior to total cholesterol alone.</td>
+                        </tr>
+                        <tr>
+                            <td class="spec-value">pulse_pressure</td>
+                            <td><code>systolic_bp - diastolic_bp</code></td>
+                            <td>Marker of arterial stiffness and vascular aging.</td>
+                        </tr>
+                        <tr>
+                            <td class="spec-value">mean_arterial_pressure</td>
+                            <td><code>diastolic_bp + (pulse_pressure / 3)</code></td>
+                            <td>Average organ perfusion pressure.</td>
+                        </tr>
+                        <tr>
+                            <td class="spec-value">metabolic_risk</td>
+                            <td>Composite score (BMI&gt;30 + Glucose&gt;100 + TG&gt;150 + HDL&lt;40 + SBP&gt;130)</td>
+                            <td>Quantifies Metabolic Syndrome criteria burden.</td>
+                        </tr>
+                        <tr>
+                            <td class="spec-value">age_sbp_product</td>
+                            <td><code>age * systolic_bp / 100</code></td>
+                            <td>Non-linear age-amplified hypertension severity.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tab 3: ML Ensemble & Calibration -->
+            <div id="ml-ensemble" class="tab-content glass-card">
+                <div class="card-header">
+                    <div class="card-icon">🤖</div>
+                    <div>
+                        <div class="card-title">Probabilistic Multi-Model Ensemble</div>
+                        <div class="card-subtitle">Isotonic Calibration + Survival Analysis + Ridge Regression</div>
+                    </div>
+                </div>
+
+                <p>CardioRisk AI combines three distinct model paradigms to maximize discriminative performance while ensuring strict probabilistic calibration:</p>
+
+                <table class="spec-table">
+                    <thead>
+                        <tr>
+                            <th>Model Component</th>
+                            <th>Technique / Hyperparameters</th>
+                            <th>5-Fold CV ROC-AUC</th>
+                            <th>5-Fold CV Brier Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><b>XGBoost (Isotonic)</b></td>
+                            <td>500 trees, depth 5, lr 0.05 + Isotonic regression calibration</td>
+                            <td class="spec-value">0.8945 ± 0.0162</td>
+                            <td class="spec-value">0.0649 ± 0.0023</td>
+                        </tr>
+                        <tr>
+                            <td><b>Random Survival Forest</b></td>
+                            <td>200 survival trees evaluating 5-year cumulative hazard</td>
+                            <td class="spec-value">0.8790 ± 0.0166</td>
+                            <td class="spec-value">0.0693 ± 0.0030</td>
+                        </tr>
+                        <tr>
+                            <td><b>Logistic Regression (L2)</b></td>
+                            <td>Ridge penalty (C=0.5), balanced class weighting</td>
+                            <td class="spec-value">0.9028 ± 0.0152</td>
+                            <td class="spec-value">0.1202 ± 0.0012</td>
+                        </tr>
+                        <tr style="background: rgba(59, 130, 246, 0.1);">
+                            <td><b>Weighted Ensemble</b></td>
+                            <td><code>0.50*XGB + 0.25*RSF + 0.25*LR</code></td>
+                            <td class="spec-value" style="color: var(--accent-emerald);">0.9022 ± 0.0152</td>
+                            <td class="spec-value" style="color: var(--accent-emerald);">0.0670 ± 0.0020</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tab 4: SHAP Explainability -->
+            <div id="shap-explain" class="tab-content glass-card">
+                <div class="card-header">
+                    <div class="card-icon">🔍</div>
+                    <div>
+                        <div class="card-title">SHAP Explainability Core</div>
+                        <div class="card-subtitle">TreeExplainer for local and global clinician feature attributions</div>
+                    </div>
+                </div>
+
+                <p>SHAP (SHapley Additive exPlanations) grounds model transparency in cooperative game theory. The model prediction is expressed as:</p>
+
+                <div class="code-snippet">
+<span class="code-comment"># Additive Feature Attribution Formula</span>
+f(x) = E[f(X)] + &sum; &phi;_i(x)
+
+Where:
+  E[f(X)]  = Baseline expected risk score (~11.5%)
+  &phi;_i(x)   = Patient-specific contribution of feature i
+  &phi;_i &gt; 0 = Increases risk (e.g. Smoking, SBP 160mmHg)
+  &phi;_i &lt; 0 = Protective factor (e.g. HDL 65mg/dL, Active)
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            CardioRisk AI Engine · Engineered with XGBoost, scikit-survival, SHAP & Streamlit · Latency &lt; 200ms
+        </footer>
+    </div>
+
+    <script>
+        function openTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+</html>
